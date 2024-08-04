@@ -98,11 +98,11 @@ class QwenMoE(MoEOutputArchitecture):
         modifications.append(("norm_topk_prob", True, False))
         out_cfg.norm_topk_prob = False  # 修改此行
         out_cfg.sliding_window = None
-        out_cfg.use_sliding_window = False
-        modifications.append(("use_sliding_window", False, True))
-        out_cfg.use_sliding_window = True  # 修改此行
-        modifications.append(("sliding_window", None, 32768))
-        out_cfg.sliding_window = 32768  # 修改此行
+        # out_cfg.use_sliding_window = False
+        # modifications.append(("use_sliding_window", False, True))
+        # out_cfg.use_sliding_window = True  # 修改此行
+        # modifications.append(("sliding_window", None, 32768))
+        # out_cfg.sliding_window = 32768  # 修改此行
         modifications.append(("max_position_embeddings", None, 32768))
         out_cfg.max_position_embeddings = 32768  # 修改此行
         modifications.append(("hidden_size", None, 1536))
