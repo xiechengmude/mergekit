@@ -91,9 +91,13 @@ class QwenMoE(MoEOutputArchitecture):
         out_cfg.norm_topk_prob = True
         out_cfg.sliding_window = None
         out_cfg.max_position_embeddings = 32768  # 修改此行
+        out_cfg.intermediate_size = 5632  # 修改此行
+        out_cfg.num_hidden_layers = 24  # 修改此行
+        out_cfg.shared_expert_intermediate_size = 5632 # 修改此行
+        #out_cfg.shared_expert_intermediate_size = out_cfg.intermediate_size
+        #out_cfg.moe_intermediate_size = out_cfg.intermediate_size
+        out_cfg.moe_intermediate_size = 1408
         out_cfg.use_sliding_window = False
-        out_cfg.shared_expert_intermediate_size = out_cfg.intermediate_size
-        out_cfg.moe_intermediate_size = out_cfg.intermediate_size
 
         if (out_cfg.num_experts & (out_cfg.num_experts - 1)) != 0:
             logging.warning(
