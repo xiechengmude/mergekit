@@ -105,11 +105,11 @@ class QwenMoE(MoEOutputArchitecture):
         out_cfg.sliding_window = 32768  # 修改此行
         modifications.append(("max_position_embeddings", None, 32768))
         out_cfg.max_position_embeddings = 32768  # 修改此行
-        modifications.append(("hidden_size", None, 2048))
-        out_cfg.hidden_size = 2048  # 修改此行
+        modifications.append(("hidden_size", None, 1536))
+        out_cfg.hidden_size = 1536  # 修改此行
         out_cfg.num_attention_heads = 16  # 保持注意力头数量
         modifications.append(("num_hidden_layers", None, 24))
-        out_cfg.num_hidden_layers = 24  # 修改此行
+        out_cfg.num_hidden_layers = 28  # 修改此行
         modifications.append(("intermediate_size", None, 5632))
         out_cfg.intermediate_size = 5632  # 修改此行
         out_cfg.shared_expert_intermediate_size = out_cfg.intermediate_size
@@ -117,8 +117,8 @@ class QwenMoE(MoEOutputArchitecture):
         out_cfg.shared_expert_intermediate_size = 5632  # 修改此行
 
         out_cfg.moe_intermediate_size = out_cfg.intermediate_size
-        modifications.append(("moe_intermediate_size", None, 1408))
-        out_cfg.moe_intermediate_size = 1408  # 修改此行
+        modifications.append(("moe_intermediate_size", None, 5632))
+        out_cfg.moe_intermediate_size = 5632  # 修改此行
 
         if (out_cfg.num_experts & (out_cfg.num_experts - 1)) != 0:
             logging.warning(
