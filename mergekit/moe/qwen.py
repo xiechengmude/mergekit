@@ -77,40 +77,95 @@ class QwenMoE(MoEOutputArchitecture):
             return False
         return True
 
-    def _generate_config(
-        self,
-        base_config: transformers.PretrainedConfig,
-        num_experts: int,
-        experts_per_token: Optional[int] = None,
-    ) -> Qwen2MoeConfig:
-        out_cfg = Qwen2MoeConfig(**base_config.to_dict())
-        out_cfg.architectures = ["Qwen2MoeForCausalLM"]
-        out_cfg.num_experts = num_experts
-        out_cfg.num_experts_per_tok = experts_per_token or 2 
-        out_cfg.decoder_sparse_step = 1
-        out_cfg.norm_topk_prob = True
-        out_cfg.norm_topk_prob = False  # 修改此行
-        out_cfg.sliding_window = None
-        out_cfg.use_sliding_window = False
-        out_cfg.use_sliding_window = True  # 修改此行
-        out_cfg.sliding_window = 32768  # 修改此行
-        out_cfg.max_position_embeddings = 32768  # 修改此行
-        out_cfg.hidden_size = 2048  # 修改此行
-        out_cfg.num_attention_heads = 16  # 保持注意力头数量
-        out_cfg.num_hidden_layers = 24  # 修改此行
-        out_cfg.intermediate_size = 5632  # 修改此行
-        out_cfg.shared_expert_intermediate_size = out_cfg.intermediate_size
-        out_cfg.shared_expert_intermediate_size = 5632  # 修改此行
+def _generate_config(
+    base_config: transformers.PretrainedConfig,
+    num_experts: int,
+    experts_per_token: Optional[int] = None,
+) -> Qwen2MoeConfig:
+    out_cfg = Qwen2MoeConfig(**base_config.to_dict())
+    
+    print("Initial configuration:")
+    print(out_cfg)
 
-        out_cfg.moe_intermediate_size = out_cfg.intermediate_size
-        out_cfg.moe_intermediate_size = 1408  # 修改此行
+    modifications = []
 
-        if (out_cfg.num_experts & (out_cfg.num_experts - 1)) != 0:
-            logging.warning(
-                f"Your model has {out_cfg.num_experts} experts, which is "
-                "not a power of two. The model will not be usable in llama.cpp."
-            )
-        return out_cfg
+    out_cfg.architectures = ["Qwen2MoeForCausalLM"]
+    out_cfg.num_experts = num_experts
+    out_cfg.num_experts_per_tok = experts_per_token or 2 
+    out_cfg.decoder_sparse_step = 1
+    out_cfg.norm_topk_prob = True
+    modifications.append(("norm_topk_prob", True, False))
+    out_cfg.norm_topk_prob = False  # 修改此行
+    out_cfg.sliding_window = None
+    out_cfg.use_sliding_window = False
+    modifications.append(("use_sliding_window", False, True))
+    out_cfg.use_sliding_window = True  # 修改此行
+    modifications.append(("sliding_window", None, 32768))
+    out_cfg.sliding_window = 32768  # 修改此行
+    modifications.append(("max_position_embeddings", None, 32768))
+    out_cfg.max_position_embeddings = 32768  # 修改此行
+    modifications.append(("hidden_size", None, 2048))
+    out_cfg.hidden_size = 2048  # 修改此行
+    out_cfg.num_attention_heads = 16  # 保持注意力头数量
+    modifications.append(("num_hidden_layers", None, 24))
+    out_cfg.num_hidden_layers = 24  # 修改此行
+    modifications.append(("intermediate_size", None, 5632))
+    out_cfg.intermediate_size = 5632  # 修改此行
+    out_cfg.shared_expert_intermediate_size = out_cfg.intermediate_size
+    modifications.append(("shared_expert_intermediate_size", None, 5632))
+    out_cfg.shared_expert_intermediate_size = 5632  # 修改此行
+
+    out_cfg.moe_intermediate_size = out_cfg.intermediate_size
+    modifications.append(("moe_intermediate_size", None, 1408))
+    out_cfg.moe_intermediate_size = 1408  # 修改此行
+
+    if (out_cfg.num_experts & (out_cfg.num_experts - 1)) != 0:
+        logging.warning(
+            f"Your model has {out_cfg.num_experts} experts, which is "
+            "not a power of two. The model will not be usable in llama.cpp."
+        )
+
+    print("\nModifications:")
+    for param, old_value, new_value in modifications:
+        print(f"{param} 参数 从 {old_value} 修改为 {new_value}")
+
+    return out_cfg
+
+
+    # def _generate_config(
+    #     self,
+    #     base_config: transformers.PretrainedConfig,
+    #     num_experts: int,
+    #     experts_per_token: Optional[int] = None,
+    # ) -> Qwen2MoeConfig:
+    #     out_cfg = Qwen2MoeConfig(**base_config.to_dict())
+    #     out_cfg.architectures = ["Qwen2MoeForCausalLM"]
+    #     out_cfg.num_experts = num_experts
+    #     out_cfg.num_experts_per_tok = experts_per_token or 2 
+    #     out_cfg.decoder_sparse_step = 1
+    #     out_cfg.norm_topk_prob = True
+    #     out_cfg.norm_topk_prob = False  # 修改此行
+    #     out_cfg.sliding_window = None
+    #     out_cfg.use_sliding_window = False
+    #     out_cfg.use_sliding_window = True  # 修改此行
+    #     out_cfg.sliding_window = 32768  # 修改此行
+    #     out_cfg.max_position_embeddings = 32768  # 修改此行
+    #     out_cfg.hidden_size = 2048  # 修改此行
+    #     out_cfg.num_attention_heads = 16  # 保持注意力头数量
+    #     out_cfg.num_hidden_layers = 24  # 修改此行
+    #     out_cfg.intermediate_size = 5632  # 修改此行
+    #     out_cfg.shared_expert_intermediate_size = out_cfg.intermediate_size
+    #     out_cfg.shared_expert_intermediate_size = 5632  # 修改此行
+
+    #     out_cfg.moe_intermediate_size = out_cfg.intermediate_size
+    #     out_cfg.moe_intermediate_size = 1408  # 修改此行
+
+    #     if (out_cfg.num_experts & (out_cfg.num_experts - 1)) != 0:
+    #         logging.warning(
+    #             f"Your model has {out_cfg.num_experts} experts, which is "
+    #             "not a power of two. The model will not be usable in llama.cpp."
+    #         )
+    #     return out_cfg
 
     def write_model(
         self,
