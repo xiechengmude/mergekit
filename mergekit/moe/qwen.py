@@ -97,7 +97,7 @@ class QwenMoE(MoEOutputArchitecture):
         out_cfg.max_position_embeddings = 32768  # 修改此行
         out_cfg.hidden_size = 1536  # 修改此行
         out_cfg.num_attention_heads = 12  # 保持注意力头数量
-        out_cfg.num_hidden_layers = 24  # 修改此行
+        #out_cfg.num_hidden_layers = 24  # 修改此行
         out_cfg.intermediate_size = 5120  # 在模型A和模型B之间
 
         # 调整专家网络的中间层大小和共享专家的中间层大小
@@ -206,6 +206,7 @@ class QwenMoE(MoEOutputArchitecture):
 
         # 确保生成的路由器权重与模型配置中的层数一致
         num_layers = out_cfg.num_hidden_layers  # 使用配置中的隐藏层数量（新增代码）
+        print("使用配置中的隐藏层数量:{}".format(num_layers))
         
         # 遍历所有隐藏层并打印当前层信息（新增代码）
         for layer_idx in range(num_layers):
