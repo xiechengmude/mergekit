@@ -1,0 +1,38 @@
+base_model: Qwen/Qwen2-1.5B-Instruct
+gate_mode: hidden
+dtype: bfloat16
+experts_per_token: 2
+experts:
+  - source_model: Qwen/Qwen2-1.5B-Instruct
+  - source_model: Qwen/Qwen2-1.5B-Instruct
+  - source_model: Qwen/Qwen2-1.5B-Instruct
+  - source_model: Qwen/Qwen2-1.5B-Instruct
+  - source_model: Qwen/Qwen2-1.5B-Instruct
+  - source_model: Qwen/Qwen2-1.5B-Instruct
+  - source_model: Qwen/Qwen2-1.5B-Instruct
+  - source_model: Qwen/Qwen2-1.5B-Instruct
+shared_experts:
+  - source_model: Qwen/Qwen2-1.5B-Instruct
+    positive_prompts: # required by Qwen MoE for "hidden" gate mode, otherwise not allowed
+      - "Strategies for effective online teaching"
+      - "Generate creative writing prompts for a novel"
+      - "Dialogue script for a video game scenario"
+      - "Constructing an engaging blog post on technology trends"
+      - "Python coding tips for beginners"
+      - "Developing characters for a fantasy story"
+      - "Strategies for effective online teaching"
+      - "Guide to writing a technical paper in computer science"
+      - "Explaining software development life cycle (SDLC)"
+      - "Tips for engaging online content creation"
+      - "Overview of the latest web development frameworks"
+    negative_prompts:
+      - "Performing a detailed company financial analysis"
+      - "Creating a workout plan for athletes"
+      - "Restoration tips for classic cars"
+      - "Psychological assessment techniques"
+      - "Surgical techniques in modern medicine"
+    # (optional, but recommended:)
+    residual_scale: 0.1
+
+#meta-llama/Meta-Llama-3-8B-Instruct
+#CUDA_VISIBLE_DEVICES='' mergekit-moe xDAN-L1-8x1.5b-MoE-0802.yaml xDAN-L1-8x1.5b-MoE-0802 --clone-tensors
