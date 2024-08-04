@@ -78,6 +78,7 @@ class QwenMoE(MoEOutputArchitecture):
         return True
 
     def _generate_config(
+        self,
         base_config: transformers.PretrainedConfig,
         num_experts: int,
         experts_per_token: Optional[int] = None,
