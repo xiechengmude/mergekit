@@ -114,122 +114,122 @@ class QwenMoE(MoEOutputArchitecture):
             )
         return out_cfg
 
-def write_model(
-    self,
-    out_path: str,
-    config: MoEMergeConfig,
-    merge_options: MergeOptions,
-    router_weights: List[torch.Tensor],
-    shared_router_weights: Optional[List[torch.Tensor]] = None,
-):
-    base_model = config.base_model
-    base_cfg = base_model.config(trust_remote_code=merge_options.trust_remote_code)
-
-    out_dtype = select_dtype(config, base_cfg)
-    out_cfg = self._generate_config(
-        base_cfg,
-        len(config.experts),
-        config.experts_per_token,
-    )
-    if out_dtype is not None:
-        out_cfg.torch_dtype = out_dtype
-    out_cfg.save_pretrained(out_path)
-
-    shared_def = config.shared_experts[0]
-
-    loaders, base_loader, writer = initialize_io(config, out_path, merge_options)
-    shared_loader = loaders.get(shared_def.source_model) if shared_def else None
-
-    # 遍历所有权重，并确保与模型配置一致
-    for weight_info in tqdm.tqdm(
-        QWEN2_INFO.all_weights(base_cfg),
-        desc="Weights",
+    def write_model(
+        self,
+        out_path: str,
+        config: MoEMergeConfig,
+        merge_options: MergeOptions,
+        router_weights: List[torch.Tensor],
+        shared_router_weights: Optional[List[torch.Tensor]] = None,
     ):
-        tensor_name = weight_info.name
-        if ".mlp." in tensor_name:
-            for expert_idx, expert in enumerate(config.experts):
-                expert_name = tensor_name.replace(
-                    ".mlp.", f".mlp.experts.{expert_idx}."
-                )
-                expert_loader = loaders.get(expert.source_model)
-                tensor = expert_loader.get_tensor(
+        base_model = config.base_model
+        base_cfg = base_model.config(trust_remote_code=merge_options.trust_remote_code)
+
+        out_dtype = select_dtype(config, base_cfg)
+        out_cfg = self._generate_config(
+            base_cfg,
+            len(config.experts),
+            config.experts_per_token,
+        )
+        if out_dtype is not None:
+            out_cfg.torch_dtype = out_dtype
+        out_cfg.save_pretrained(out_path)
+
+        shared_def = config.shared_experts[0]
+
+        loaders, base_loader, writer = initialize_io(config, out_path, merge_options)
+        shared_loader = loaders.get(shared_def.source_model) if shared_def else None
+
+        # 遍历所有权重，并确保与模型配置一致
+        for weight_info in tqdm.tqdm(
+            QWEN2_INFO.all_weights(base_cfg),
+            desc="Weights",
+        ):
+            tensor_name = weight_info.name
+            if ".mlp." in tensor_name:
+                for expert_idx, expert in enumerate(config.experts):
+                    expert_name = tensor_name.replace(
+                        ".mlp.", f".mlp.experts.{expert_idx}."
+                    )
+                    expert_loader = loaders.get(expert.source_model)
+                    tensor = expert_loader.get_tensor(
+                        weight_info.name, aliases=weight_info.aliases
+                    )
+                    tensor = noise_and_scale(
+                        tensor, expert, is_residual="down_proj" in tensor_name
+                    )
+                    writer.save_tensor(
+                        expert_name,
+                        tensor.to(dtype=out_dtype),
+                        clone=merge_options.clone_tensors,
+                    )
+
+                shared_tensor = shared_loader.get_tensor(
                     weight_info.name, aliases=weight_info.aliases
                 )
-                tensor = noise_and_scale(
-                    tensor, expert, is_residual="down_proj" in tensor_name
+                shared_tensor = noise_and_scale(
+                    shared_tensor,
+                    shared_def,
+                    is_residual="down_proj" in tensor_name,
                 )
                 writer.save_tensor(
-                    expert_name,
-                    tensor.to(dtype=out_dtype),
+                    tensor_name.replace(".mlp.", ".mlp.shared_expert."),
+                    shared_tensor.to(dtype=out_dtype),
                     clone=merge_options.clone_tensors,
                 )
-
-            shared_tensor = shared_loader.get_tensor(
-                weight_info.name, aliases=weight_info.aliases
-            )
-            shared_tensor = noise_and_scale(
-                shared_tensor,
-                shared_def,
-                is_residual="down_proj" in tensor_name,
-            )
-            writer.save_tensor(
-                tensor_name.replace(".mlp.", ".mlp.shared_expert."),
-                shared_tensor.to(dtype=out_dtype),
-                clone=merge_options.clone_tensors,
-            )
-        else:
-            try:
-                tensor = base_loader.get_tensor(
-                    tensor_name, aliases=weight_info.aliases
-                )
-            except KeyError:
-                if tensor_name.endswith("_proj.bias"):
-                    # qwen 2 moe wants attention bias, give it zeros
-                    head_dim = out_cfg.hidden_size // out_cfg.num_attention_heads
-                    num_heads = (
-                        out_cfg.num_key_value_heads
-                        if (
-                            tensor_name.endswith("k_proj.bias")
-                            or tensor_name.endswith("v_proj.bias")
-                        )
-                        else out_cfg.num_attention_heads
+            else:
+                try:
+                    tensor = base_loader.get_tensor(
+                        tensor_name, aliases=weight_info.aliases
                     )
-                    tensor = torch.zeros(num_heads * head_dim, dtype=out_dtype)
-                else:
-                    raise
+                except KeyError:
+                    if tensor_name.endswith("_proj.bias"):
+                        # qwen 2 moe wants attention bias, give it zeros
+                        head_dim = out_cfg.hidden_size // out_cfg.num_attention_heads
+                        num_heads = (
+                            out_cfg.num_key_value_heads
+                            if (
+                                tensor_name.endswith("k_proj.bias")
+                                or tensor_name.endswith("v_proj.bias")
+                            )
+                            else out_cfg.num_attention_heads
+                        )
+                        tensor = torch.zeros(num_heads * head_dim, dtype=out_dtype)
+                    else:
+                        raise
 
+                    writer.save_tensor(
+                        tensor_name,
+                        tensor.to(dtype=out_dtype),
+                        clone=merge_options.clone_tensors,
+                    )
+
+        # 确保生成的路由器权重与模型配置中的层数一致
+        num_layers = out_cfg.num_hidden_layers  # 使用配置中的隐藏层数量（新增代码）
+        
+        # 遍历所有隐藏层并打印当前层信息（新增代码）
+        for layer_idx in range(num_layers):
+            print(f"Processing layer {layer_idx}")  # 打印当前层的信息（新增代码）
+
+            if layer_idx < len(router_weights):
                 writer.save_tensor(
-                    tensor_name,
-                    tensor.to(dtype=out_dtype),
+                    f"model.layers.{layer_idx}.mlp.gate.weight",
+                    router_weights[layer_idx].to(dtype=out_dtype).contiguous(),
                     clone=merge_options.clone_tensors,
                 )
+            else:
+                logging.warning(f"Missing router weight for layer {layer_idx}")  # 新增代码
 
-    # 确保生成的路由器权重与模型配置中的层数一致
-    num_layers = out_cfg.num_hidden_layers  # 使用配置中的隐藏层数量（新增代码）
-    
-    # 遍历所有隐藏层并打印当前层信息（新增代码）
-    for layer_idx in range(num_layers):
-        print(f"Processing layer {layer_idx}")  # 打印当前层的信息（新增代码）
+            if shared_router_weights and layer_idx < len(shared_router_weights):
+                writer.save_tensor(
+                    f"model.layers.{layer_idx}.mlp.shared_expert_gate.weight",
+                    shared_router_weights[layer_idx].to(dtype=out_dtype).contiguous(),
+                    clone=merge_options.clone_tensors,
+                )
+            else:
+                logging.warning(f"Missing shared router weight for layer {layer_idx}")  # 新增代码
 
-        if layer_idx < len(router_weights):
-            writer.save_tensor(
-                f"model.layers.{layer_idx}.mlp.gate.weight",
-                router_weights[layer_idx].to(dtype=out_dtype).contiguous(),
-                clone=merge_options.clone_tensors,
-            )
-        else:
-            logging.warning(f"Missing router weight for layer {layer_idx}")  # 新增代码
-
-        if shared_router_weights and layer_idx < len(shared_router_weights):
-            writer.save_tensor(
-                f"model.layers.{layer_idx}.mlp.shared_expert_gate.weight",
-                shared_router_weights[layer_idx].to(dtype=out_dtype).contiguous(),
-                clone=merge_options.clone_tensors,
-            )
-        else:
-            logging.warning(f"Missing shared router weight for layer {layer_idx}")  # 新增代码
-
-    writer.finalize()
+        writer.finalize()
 
 
     # def write_model(
